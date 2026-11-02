@@ -32,7 +32,7 @@ A compact, custom-designed flight controller board for multirotor drones, built 
 ```
 .
 ├── hardware/
-│   ├── SCH_Schematic1_1-P1_2026-11-02.png   # Schematic (image)
+│   ├── SCH_Schematic1_2026-11-03.pdf        # Schematic (PDF)
 │   ├── PCB_PCB1_2026-11-02.pdf              # PCB layout / BOM (PDF)
 │   └── easyeda/                             # EasyEDA project source (add if available)
 ├── firmware/                                # Firmware source (add)
@@ -112,9 +112,11 @@ A compact, custom-designed flight controller board for multirotor drones, built 
 ### Power
 
 - Input: 5 V from USB-C VBUS
-- 3.3 V: MS1117-3.3V with 100 nF capacitors on input/output
+- 3.3 V: MS1117-3.3V with 10 µF capacitors on the input and output (C7, C8) and 100 nF on the 5 V side (C9)
 - VDDA is filtered through ferrite bead L1
-- 4 × 100 nF decoupling on VDD pins, plus bulk/decoupling for sensors
+- 100 nF decoupling on the VDD pins (C1–C5), 1 µF on VBAT/VDDA net (C6)
+- VCAP_1 / VCAP_2 have C10 / C11 (shown as 2.2 on the schematic, see Known Issues)
+- USB-C CC1/CC2 use 5.1 kΩ pull-downs (R3, R4) so the board is detected as a USB device
 
 ### Boot & Programming
 
@@ -148,12 +150,17 @@ Firmware is not yet included. Candidate options:
 
 ## Bill of Materials
 
-The full BOM (with LCSC part numbers) is in `hardware/PCB_PCB1_2026-11-02.pdf`. Summary:
+The BOM exported from EasyEDA (with LCSC part numbers) is in `hardware/PCB_PCB1_2026-11-02.pdf`. **That BOM predates the latest schematic (2026-11-03) and still lists the old capacitor and resistor values, so re-export it before ordering.** The table below follows the latest schematic:
 
 | Qty | Designators | Value / Part | Footprint |
 |----:|-------------|--------------|-----------|
-| 8 | C1–C6, C10, C11 | 100 nF | 0201 |
-| 9 | C7–C9, C12, C13, C20–C23 | 100 nF | 0603 |
+| 5 | C1–C5 | 100 nF | 0201 |
+| 1 | C6 | 1 µF | 0201 |
+| 2 | C10, C11 | 2.2 µF (VCAP, label reads "2.2pF", see Known Issues) | 0201 |
+| 2 | C7, C8 | 10 µF (LDO input/output) | 0603 |
+| 3 | C9, C12, C13 | 100 nF | 0603 |
+| 2 | C20, C21 | 10 pF (8 MHz crystal load) | 0603 |
+| 2 | C22, C23 | 12 pF (32.768 kHz crystal load) | 0603 |
 | 6 | C14–C19 | 0.1 µF | 0603 |
 | 1 | U1 | STM32F405RGT6 | LQFP-64 |
 | 1 | U2 | MS1117-3.3V | SOT-223 |
@@ -163,8 +170,9 @@ The full BOM (with LCSC part numbers) is in `hardware/PCB_PCB1_2026-11-02.pdf`. 
 | 1 | X1 | 8 MHz crystal (X49SD8MSB2SI) | HC-49US |
 | 1 | X2 | 32.768 kHz crystal (SF32WK32768D31T002) | SMD 3.2×1.5 |
 | 1 | L1 | BLM18PG121SN1D ferrite bead | 0603 |
-| 2 | R1, R2 | 470 Ω | 0603 |
-| 3 | R3, R4, R7 | 10 kΩ | 0603 |
+| 2 | R1, R2 | 470 Ω (per BOM) | 0603 |
+| 2 | R3, R4 | 5.1 kΩ (USB-C CC) | 0603 |
+| 1 | R7 | 10 kΩ | 0603 |
 | 2 | R5, R6 | 22 Ω | 0603 |
 | 6 | R8–R13 | 1 kΩ | 0603 |
 | 2 | SW1, SW2 | HX 3x4x2.5-PA-4N push button | SMD 4P |
@@ -178,22 +186,21 @@ The full BOM (with LCSC part numbers) is in `hardware/PCB_PCB1_2026-11-02.pdf`. 
 
 ## Known Issues / Review Notes
 
-These are observations from reviewing the schematic and should be checked **before fabricating or powering a board**:
+Several problems from the earlier revision have been fixed in the 2026-11-03 schematic: the USB-C CC resistors are now 5.1 kΩ, the LDO capacitors are 10 µF, and the crystal load capacitors are now in the pF range. Remaining items to check **before fabricating or powering a board**:
 
-1. **VCAP capacitors (C10, C11):** the STM32F405 requires about **2.2 µF** (low-ESR) on each VCAP pin for the internal regulator. The schematic and BOM currently show **100 nF** (0201).
-2. **Crystal load capacitors (C20, C21, C22, C23):** shown as **100 nF**. Crystal load caps are typically in the **pF** range (e.g. 8–22 pF for HSE; ~6–12 pF for the 32.768 kHz LSE). Values should be computed from the crystals' datasheet load capacitance.
-3. **3.3 V LDO output capacitor:** AMS1117-type regulators usually need a larger (≈10 µF+) output capacitor for stability. Check the MS1117 datasheet.
-4. **USB-C CC pins:** R3/R4 are 10 kΩ and appear to connect to VBUS. A USB-C *device* normally needs **5.1 kΩ pull-downs to GND** on CC1/CC2 to be recognized by C-to-C hosts/chargers.
-5. **No SWD header:** PA13/PA14 are not exposed; flashing is only possible over USB DFU.
-6. **No battery voltage / current sensing** or dedicated power input on this revision.
+1. **VCAP capacitor labels (C10, C11):** the schematic text reads **2.2pF**, but the STM32F405 needs about **2.2 µF** (low-ESR) on each VCAP pin. This looks like a unit typo; correct it to 2.2 µF and make sure the footprint/part can actually be a 2.2 µF capacitor.
+2. **Crystal load capacitors:** C20/C21 (10 pF) and C22/C23 (12 pF) are now in a sensible range, but the right values depend on each crystal's datasheet load capacitance and the PCB stray capacitance. Please verify them.
+3. **BOM out of date:** the BOM PDF (2026-11-02) is older than the schematic (2026-11-03) and still shows 100 nF for C7–C10, C20–C23 and 10 kΩ for R3/R4. Re-export it, and confirm the PCB layout was updated with the new footprints.
+4. **No SWD header:** PA13/PA14 are not broken out; flashing is only possible over USB DFU.
+5. **No battery voltage / current sensing** or dedicated power input on this revision.
 
 ---
 
 ## Roadmap
 
-- [ ] Fix capacitor values (VCAP, crystals) and re-spin PCB
+- [x] Fix USB-C CC resistors, LDO capacitors and crystal load capacitors
+- [ ] Correct VCAP capacitor labels to 2.2 µF and re-export the BOM
 - [ ] Add SWD header
-- [ ] Fix USB-C CC resistors
 - [ ] Add battery voltage sensing and power input
 - [ ] Write / port firmware
 - [ ] Add 3D render and assembly photos
